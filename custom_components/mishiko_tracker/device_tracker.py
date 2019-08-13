@@ -21,15 +21,12 @@ PETS_URL = 'https://api2.mishiko.intech-global.com/devpet/list?timezone={}'
 LOCATIONS_URL = 'https://api2.mishiko.intech-global.com/devpet/locations'
 
 DOMAIN = 'mishikotracker'
-
 CONF_USERNAME = 'email'
 CONF_PASSWORD = 'password'
 CONF_TIMEZONE = 'timezone'
-
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({vol.Required(CONF_USERNAME, default=''): cv.string, 
  vol.Required(CONF_PASSWORD, default=''): cv.string, 
  vol.Required(CONF_TIMEZONE): cv.positive_int})
-
 CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({vol.Required(CONF_USERNAME, default=''): cv.string, 
           vol.Required(CONF_PASSWORD, default=''): cv.string, 
           vol.Required(CONF_TIMEZONE): cv.positive_int})},
@@ -133,9 +130,9 @@ class MishikoTracker:
 
                     locations_info = {}
                     for location in locations['pets']:
-                        locations_info[location['id']] = {'gps_accuracy': location['accuracy'], 'battery': location['batteryCharge'], 'lat': location['lat'],
+                        locations_info[location['id']] = {'gps_accuracy': location['accuracy'], 'battery': abs(location['batteryCharge']), 'lat': location['lat'],
         'lon': location['lon']}
-                    
+
                     return locations_info
         except Exception as error:
             try:
@@ -163,7 +160,7 @@ async def setup_scanner(hass, config, see, discovery_info=None):
                 for pet in pets:
                     pet.update(see, _locations[pet.dev_id])
             finally:
-                hass.helpers.event.async_track_point_in_utc_time(update_interval, util.dt.utcnow() + SCAN_INTERVAL)
+                hass.helpers.event.async_track_point_in_utc_time(update_interval(), util.dt.utcnow() + interval)
 
         await update_interval()
 
