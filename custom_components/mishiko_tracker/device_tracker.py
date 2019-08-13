@@ -8,10 +8,9 @@ device_tracker:
 import logging, sys, json, time
 from datetime import timedelta
 import voluptuous as vol
-from homeassistant.util import Throttle
 import homeassistant.helpers.config_validation as cv
 from homeassistant.components.device_tracker import PLATFORM_SCHEMA
-from homeassistant.components.device_tracker.const import CONF_SCAN_INTERVAL, SCAN_INTERVAL, SOURCE_TYPE_ROUTER
+from homeassistant.components.device_tracker.const import CONF_SCAN_INTERVAL, SCAN_INTERVAL, SOURCE_TYPE_GPS
 from homeassistant import util
 import aiohttp
 __version__ = '1.0.0'
@@ -22,12 +21,15 @@ PETS_URL = 'https://api2.mishiko.intech-global.com/devpet/list?timezone={}'
 LOCATIONS_URL = 'https://api2.mishiko.intech-global.com/devpet/locations'
 
 DOMAIN = 'mishikotracker'
+
 CONF_USERNAME = 'email'
 CONF_PASSWORD = 'password'
 CONF_TIMEZONE = 'timezone'
+
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({vol.Required(CONF_USERNAME, default=''): cv.string, 
  vol.Required(CONF_PASSWORD, default=''): cv.string, 
  vol.Required(CONF_TIMEZONE): cv.positive_int})
+
 CONFIG_SCHEMA = vol.Schema({DOMAIN: vol.Schema({vol.Required(CONF_USERNAME, default=''): cv.string, 
           vol.Required(CONF_PASSWORD, default=''): cv.string, 
           vol.Required(CONF_TIMEZONE): cv.positive_int})},
@@ -41,8 +43,7 @@ class Pet:
         self.host_name = dev_name
 
     def update(self, see, data):
-        gps = (data['lat'], data['lon'])
-        see(dev_id=self.dev_id, host_name=self.host_name, gps=gps, gps_accuracy=data['gps_accuracy'], battery=data['battery'], source_type=SOURCE_TYPE_ROUTER)
+        see(dev_id=self.dev_id, gps=(data['lat'], data['lon']), gps_accuracy=data['gps_accuracy'], battery=data['battery'], source_type=SOURCE_TYPE_GPS)
         return True
 
 
@@ -146,6 +147,9 @@ class MishikoTracker:
 async def setup_scanner(hass, config, see, discovery_info=None):
     hass.data[DOMAIN] = MishikoTracker(hass, config)
 
+    SCAN_INTERVAL = timedelta(seconds=600)
+    interval = config.get(CONF_SCAN_INTERVAL, SCAN_INTERVAL)
+            
     await hass.data[DOMAIN].doAuth()
 
     _pets = await hass.data[DOMAIN].getPets()
@@ -153,17 +157,14 @@ async def setup_scanner(hass, config, see, discovery_info=None):
     if _pets:
         pets = [Pet(dev_id, dev_name, hass, config) for (dev_id, dev_name) in _pets.items()]
 
-        async def update_interval(hass, config):
-            SCAN_INTERVAL = timedelta(seconds=60)
-            interval = config.get(CONF_SCAN_INTERVAL, SCAN_INTERVAL)
-
+        async def update_interval():
             try:
                 _locations = await hass.data[DOMAIN].getLocations()
                 for pet in pets:
                     pet.update(see, _locations[pet.dev_id])
             finally:
-                hass.helpers.event.async_track_point_in_utc_time(update_interval(hass, config), util.dt.utcnow() + SCAN_INTERVAL)
+                hass.helpers.event.async_track_point_in_utc_time(update_interval, util.dt.utcnow() + SCAN_INTERVAL)
 
-        await update_interval(hass, config)
+        await update_interval()
 
     return True
