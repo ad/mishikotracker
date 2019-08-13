@@ -1,0 +1,9 @@
+{
+  "domain": "mishikotracker",
+  "name": "Mishiko Tracker",
+  "documentation": "https://github.com/ad/mishikotracker",
+  "dependencies": [],
+  "codeowners": ["@ad"],
+  "requirements": [],
+  "homeassistant":"0.94.0"
+} 
